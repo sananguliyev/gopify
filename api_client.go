@@ -16,6 +16,7 @@ const (
 	defaultApiVersion = "2021-10"
 	defaultTimeout    = 10 * time.Second
 	defaultRetries    = 2
+	defaultJsonNumber = false
 )
 
 var (
@@ -31,7 +32,7 @@ func (err ResponseError) Error() string {
 	return fmt.Sprintf("%v", err.Errors)
 }
 
-// GraphqlErr is a general graphql error
+// GraphqlError is a general graphql error
 type GraphqlError struct {
 	msg string
 }
@@ -62,17 +63,24 @@ func WithTimeout(seconds int) Option {
 	}
 }
 
-// WithRetries tells the Api client how many retries to perform when hit a rate limit
+// WithRetry tells the Api client how many retries to perform when hit a rate limit
 func WithRetry(tries int) Option {
 	return func(c *Client) {
 		c.tries = tries
 	}
 }
 
+// WithJsonNumber uses json.Number when decode response body
+func WithJsonNumber(active bool) Option {
+	return func(c *Client) {
+		c.jsonNumber = active
+	}
+}
+
 // Body is an API request/response body
 type Body map[string]any
 
-// shopify API client
+// Client shopify API client
 type Client struct {
 	client         *http.Client
 	domain         string
@@ -80,10 +88,11 @@ type Client struct {
 	accessToken    string
 	version        string
 	tries          int
+	jsonNumber     bool
 	availableLimit int // used for handling rate limits
 }
 
-// Create a new shopify Api client
+// NewClient Create a new shopify Api client
 // the domain parameter is the shop domain
 func NewClient(domain, accessToken string, opts ...Option) *Client {
 	client := http.Client{
@@ -95,6 +104,7 @@ func NewClient(domain, accessToken string, opts ...Option) *Client {
 		accessToken:    accessToken,
 		version:        defaultApiVersion,
 		tries:          defaultRetries,
+		jsonNumber:     defaultJsonNumber,
 		availableLimit: 0,
 	}
 
@@ -173,7 +183,13 @@ func (c *Client) rest(method string, path string, queryParams url.Values, reques
 			continue
 		}
 	}
-	if err := json.NewDecoder(res.Body).Decode(&responseBody); err != nil {
+
+	decoder := json.NewDecoder(res.Body)
+	if c.jsonNumber {
+		decoder.UseNumber()
+	}
+
+	if err := decoder.Decode(&responseBody); err != nil {
 		return nil, err
 	}
 	restResponse := &RestResponse{
@@ -292,7 +308,7 @@ func (c *Client) Get(path string, queryParams url.Values, responseBody any) (*Re
 	return r, nil
 }
 
-// post performs a post request and returns the result
+// Post performs a post request and returns the result
 func (c *Client) Post(path string, requestBody any, responseBody any) (*RestResponse, error) {
 	return c.rest(http.MethodPost, path, nil, requestBody, requestBody)
 }
