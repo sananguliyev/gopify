@@ -1,17 +1,12 @@
-// gopify is a simple package for developing Shopify applications in Go
+// Package gopify is a simple package for developing Shopify applications in Go
 package gopify
 
 import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"net/http"
 	"net/url"
-)
-
-var (
-	ErrUnauthorizedRequest = errors.New("unauthorized request")
 )
 
 // Gopify holds common shopify app settings
